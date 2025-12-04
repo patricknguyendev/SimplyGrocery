@@ -8,14 +8,61 @@ import type { TripRequest, TripResponse, MatchedItem, PlanResult, PlanResponse }
 import { matchProducts, getPricesForProducts } from "./product-matcher"
 import { computeCheapestPlan, computeFastestPlan, computeBalancedPlan, calculateSingleChainTotal } from "./strategies"
 import { haversineDistance } from "@/lib/geo/distance"
+import { getDistanceMatrix, type DistanceMatrixResult, type LatLng } from "@/lib/google/distance-matrix"
 
 const DEFAULT_RADIUS_KM = 15
 const DEFAULT_MAX_STORES = 5
 
 /**
+ * Fetch distance data from Google Distance Matrix API
+ * Gets distances for:
+ *   - User origin → all stores
+ *   - All stores → all stores (for routing)
+ */
+async function fetchDistanceData(
+  origin: { lat: number; lon: number },
+  stores: Store[],
+): Promise<DistanceMatrixResult[]> {
+  if (stores.length === 0) return []
+
+  const storeLocations: LatLng[] = stores.map(s => ({ lat: s.lat, lon: s.lon }))
+  const allResults: DistanceMatrixResult[] = []
+
+  try {
+    // Call 1: Origin to all stores
+    const originToStores = await getDistanceMatrix(
+      [{ lat: origin.lat, lon: origin.lon }],
+      storeLocations,
+      { mode: 'driving', units: 'metric' },
+    )
+    allResults.push(...originToStores)
+
+    // Call 2: All stores to all stores (for multi-store routes)
+    if (stores.length > 1) {
+      const storeToStore = await getDistanceMatrix(
+        storeLocations,
+        storeLocations,
+        { mode: 'driving', units: 'metric' },
+      )
+      allResults.push(...storeToStore)
+    }
+
+    return allResults
+  } catch (error) {
+    console.error('[Optimizer] Failed to fetch distance data from Google:', error)
+    // Return empty array - strategies will fall back to haversine
+    return []
+  }
+}
+
+/**
  * Main entry point for trip optimization
  */
-export async function optimizeTrip(supabase: SupabaseClient, request: TripRequest): Promise<TripResponse> {
+export async function optimizeTrip(
+  supabase: SupabaseClient,
+  request: TripRequest,
+  userId?: string | null,
+): Promise<TripResponse> {
   const { origin, items, preferences } = request
 
   // Validate origin
@@ -38,6 +85,9 @@ export async function optimizeTrip(supabase: SupabaseClient, request: TripReques
     throw new Error("No stores found within the specified radius")
   }
 
+  // Step 1.5: Get real driving distances from Google Distance Matrix API
+  const distanceData = await fetchDistanceData(origin, stores)
+
   // Step 2: Match products
   const { matched, unmatched } = await matchProducts(supabase, items)
 
@@ -51,7 +101,7 @@ export async function optimizeTrip(supabase: SupabaseClient, request: TripReques
   const priceMap = await getPricesForProducts(supabase, productIds, storeIds)
 
   // Step 4: Create trip record
-  const tripId = await createTrip(supabase, origin, preferences)
+  const tripId = await createTrip(supabase, origin, preferences, userId)
 
   // Step 5: Create trip items and update matched items with IDs
   const tripItems = await createTripItems(supabase, tripId, matched, unmatched)
@@ -66,6 +116,7 @@ export async function optimizeTrip(supabase: SupabaseClient, request: TripReques
     stores,
     priceMap,
     maxStores,
+    distanceData, // Pass precomputed Google distances
   }
 
   const plans: PlanResult[] = []
@@ -98,7 +149,7 @@ export async function optimizeTrip(supabase: SupabaseClient, request: TripReques
   const savedPlans = await savePlans(supabase, tripId, plans, { walmartTotal, targetTotal, costcoTotal }, matched)
 
   // Step 9: Build response
-  return buildResponse(tripId, origin, tripItems, matched, savedPlans, stores)
+  return buildResponse(tripId, origin, tripItems, matched, savedPlans, stores, distanceData)
 }
 
 /**
@@ -142,10 +193,12 @@ async function createTrip(
   supabase: SupabaseClient,
   origin: TripRequest["origin"],
   preferences?: TripRequest["preferences"],
+  userId?: string | null,
 ): Promise<number> {
   const { data, error } = await supabase
     .from("trips")
     .insert({
+      user_id: userId || null,
       origin_lat: origin.lat,
       origin_lon: origin.lon,
       origin_zip: origin.zip || null,
@@ -313,6 +366,7 @@ function buildResponse(
   matched: MatchedItem[],
   savedPlans: { plan: PlanResult; planId: number }[],
   stores: Store[],
+  distanceData: DistanceMatrixResult[],
 ): TripResponse {
   // Build product lookup
   const productMap = new Map<number, Product>()
@@ -373,6 +427,7 @@ function buildResponse(
         orderIndex: visit.orderIndex,
         distanceFromPrevKm: visit.distanceFromPrevKm,
         travelTimeFromPrevMin: visit.travelTimeFromPrevMin,
+        distanceSource: visit.distanceSource,
         items: storeItems,
       }
     })
@@ -396,6 +451,23 @@ function buildResponse(
     }
   })
 
+  // Determine overall distance source
+  let googleCount = 0
+  let fallbackCount = 0
+  for (const plan of savedPlans) {
+    for (const visit of plan.plan.storeOrder) {
+      if (visit.distanceSource === 'google') googleCount++
+      else if (visit.distanceSource === 'fallback') fallbackCount++
+    }
+  }
+
+  const distanceSource: 'google' | 'fallback' | 'mixed' =
+    googleCount > 0 && fallbackCount === 0
+      ? 'google'
+      : googleCount === 0 && fallbackCount > 0
+        ? 'fallback'
+        : 'mixed'
+
   return {
     tripId,
     origin: {
@@ -405,5 +477,8 @@ function buildResponse(
     },
     items: itemsResponse,
     plans: plansResponse,
+    debug: {
+      distanceSource,
+    },
   }
 }

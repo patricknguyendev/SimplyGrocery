@@ -48,9 +48,9 @@ export function SingleStoreComparison({ plan }: SingleStoreComparisonProps) {
   }
 
   return (
-    <Card>
+    <Card className="glass-elevated rounded-2xl shadow-2xl border-glow-green">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-primary">
           <Store className="h-5 w-5" />
           Compare vs One Store
         </CardTitle>
@@ -59,19 +59,19 @@ export function SingleStoreComparison({ plan }: SingleStoreComparisonProps) {
       <CardContent>
         <div className="space-y-3">
           {/* Selected plan */}
-          <div className="rounded-lg border-2 border-primary bg-primary/5 p-4">
+          <div className="glass-elevated rounded-2xl border-primary/50 glow-green p-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-foreground">Your selected plan</span>
-                  <Badge variant="secondary" className="bg-primary/20 text-primary">
+                  <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/40">
                     {plan.stores.length} store{plan.stores.length !== 1 ? "s" : ""}
                   </Badge>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{plan.label}</p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-foreground">${plan.totalPrice.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-primary text-glow-green">${plan.totalPrice.toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -85,13 +85,13 @@ export function SingleStoreComparison({ plan }: SingleStoreComparisonProps) {
             return (
               <div
                 key={comparison.chain}
-                className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
+                className="glass rounded-lg p-4 float-on-hover transition-spring"
               >
                 <div className="flex items-center gap-3">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-foreground">All at {comparison.chain}</span>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs glass border-border">
                         {comparison.storeCount} store
                       </Badge>
                     </div>
@@ -101,13 +101,13 @@ export function SingleStoreComparison({ plan }: SingleStoreComparisonProps) {
                   <div className="text-right">
                     <p className="text-xl font-bold text-foreground">${comparison.totalPrice.toFixed(2)}</p>
                     {isPositive && (
-                      <p className={cn("mt-1 flex items-center justify-end gap-1 text-sm font-medium", "text-green-600")}>
+                      <p className={cn("mt-1 flex items-center justify-end gap-1 text-sm font-medium text-primary text-glow-green")}>
                         <TrendingDown className="h-3 w-3" />
                         You save ${savings.toFixed(2)}
                       </p>
                     )}
                     {isNegative && (
-                      <p className="mt-1 text-sm font-medium text-red-600">
+                      <p className="mt-1 text-sm font-medium text-destructive text-glow-pink">
                         +${Math.abs(savings).toFixed(2)} more
                       </p>
                     )}

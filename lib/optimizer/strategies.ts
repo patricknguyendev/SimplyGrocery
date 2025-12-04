@@ -5,6 +5,7 @@
 import type { Store } from "@/lib/db/types"
 import type { MatchedItem, PlanResult, ItemAssignment, StoreVisit } from "./types"
 import { haversineDistance, estimateTravelTime, estimateInstoreTime, nearestNeighborOrder } from "@/lib/geo/distance"
+import type { DistanceMatrixResult } from "@/lib/google/distance-matrix"
 
 interface OptimizerInput {
   origin: { lat: number; lon: number }
@@ -12,6 +13,7 @@ interface OptimizerInput {
   stores: Store[]
   priceMap: Map<string, { price: number; inStock: boolean }>
   maxStores?: number
+  distanceData?: DistanceMatrixResult[] // Precomputed distances from Google
 }
 
 /**
@@ -19,7 +21,7 @@ interface OptimizerInput {
  * Then prune stores where travel cost exceeds savings
  */
 export function computeCheapestPlan(input: OptimizerInput): PlanResult | null {
-  const { origin, items, stores, priceMap, maxStores = 5 } = input
+  const { origin, items, stores, priceMap, maxStores = 5, distanceData } = input
 
   if (items.length === 0 || stores.length === 0) return null
 
@@ -95,7 +97,7 @@ export function computeCheapestPlan(input: OptimizerInput): PlanResult | null {
   const orderedStores = nearestNeighborOrder(origin, usedStores)
 
   // Step 5: Build store visits with distances
-  const storeVisits = buildStoreVisits(origin, orderedStores, assignments)
+  const storeVisits = buildStoreVisits(origin, orderedStores, assignments, distanceData)
 
   // Step 6: Calculate totals
   const totalPrice = assignments.reduce((sum, a) => sum + a.price * a.quantity, 0)
@@ -121,7 +123,7 @@ export function computeCheapestPlan(input: OptimizerInput): PlanResult | null {
  * Picks the nearest store that has all (or most) items in stock
  */
 export function computeFastestPlan(input: OptimizerInput): PlanResult | null {
-  const { origin, items, stores, priceMap } = input
+  const { origin, items, stores, priceMap, distanceData } = input
 
   if (items.length === 0 || stores.length === 0) return null
 
@@ -144,9 +146,10 @@ export function computeFastestPlan(input: OptimizerInput): PlanResult | null {
 
     if (itemsAvailable === 0) continue
 
-    const distance = haversineDistance(origin.lat, origin.lon, store.lat, store.lon)
+    // Use Google distance if available, otherwise haversine
+    const { distanceKm } = lookupDistance(origin.lat, origin.lon, store.lat, store.lon, distanceData)
     // Score: prioritize availability, then proximity
-    const score = itemsAvailable * 1000 - distance
+    const score = itemsAvailable * 1000 - distanceKm
 
     storeScores.push({ store, score, itemsAvailable, totalPrice })
   }
@@ -174,8 +177,13 @@ export function computeFastestPlan(input: OptimizerInput): PlanResult | null {
     }
   }
 
-  const distanceKm = haversineDistance(origin.lat, origin.lon, best.store.lat, best.store.lon)
-  const travelTimeMin = estimateTravelTime(distanceKm)
+  const { distanceKm, travelTimeMin, source } = lookupDistance(
+    origin.lat,
+    origin.lon,
+    best.store.lat,
+    best.store.lon,
+    distanceData,
+  )
   const instoreTimeMin = estimateInstoreTime(assignments.length)
 
   const storeVisits: StoreVisit[] = [
@@ -185,6 +193,7 @@ export function computeFastestPlan(input: OptimizerInput): PlanResult | null {
       distanceFromPrevKm: Math.round(distanceKm * 100) / 100,
       travelTimeFromPrevMin: Math.round(travelTimeMin),
       itemCount: assignments.length,
+      distanceSource: source,
     },
   ]
 
@@ -206,7 +215,7 @@ export function computeFastestPlan(input: OptimizerInput): PlanResult | null {
  * Limits stores and weights price against travel time
  */
 export function computeBalancedPlan(input: OptimizerInput): PlanResult | null {
-  const { origin, items, stores, priceMap, maxStores = 2 } = input
+  const { origin, items, stores, priceMap, maxStores = 2, distanceData } = input
 
   if (items.length === 0 || stores.length === 0) return null
 
@@ -233,7 +242,7 @@ export function computeBalancedPlan(input: OptimizerInput): PlanResult | null {
   }
 
   for (const store of stores) {
-    const distance = haversineDistance(origin.lat, origin.lon, store.lat, store.lon)
+    const { distanceKm: distance } = lookupDistance(origin.lat, origin.lon, store.lat, store.lon, distanceData)
     let totalSavings = 0
     let itemCount = 0
 
@@ -297,7 +306,7 @@ export function computeBalancedPlan(input: OptimizerInput): PlanResult | null {
   const usedStores = stores.filter((s) => usedStoreIds.includes(s.id))
   const orderedStores = nearestNeighborOrder(origin, usedStores)
 
-  const storeVisits = buildStoreVisits(origin, orderedStores, assignments)
+  const storeVisits = buildStoreVisits(origin, orderedStores, assignments, distanceData)
 
   const totalPrice = assignments.reduce((sum, a) => sum + a.price * a.quantity, 0)
   const totalDistanceKm = storeVisits.reduce((sum, v) => sum + v.distanceFromPrevKm, 0)
@@ -318,12 +327,49 @@ export function computeBalancedPlan(input: OptimizerInput): PlanResult | null {
 }
 
 /**
+ * Helper: Look up distance from precomputed Google data
+ */
+function lookupDistance(
+  fromLat: number,
+  fromLon: number,
+  toLat: number,
+  toLon: number,
+  distanceData?: DistanceMatrixResult[],
+): { distanceKm: number; travelTimeMin: number; source: 'google' | 'fallback' } {
+  if (distanceData && distanceData.length > 0) {
+    // Find matching result (with small tolerance for floating point comparison)
+    const tolerance = 0.0001
+    const match = distanceData.find(
+      (r) =>
+        Math.abs(r.origin.lat - fromLat) < tolerance &&
+        Math.abs(r.origin.lon - fromLon) < tolerance &&
+        Math.abs(r.destination.lat - toLat) < tolerance &&
+        Math.abs(r.destination.lon - toLon) < tolerance,
+    )
+
+    if (match) {
+      return {
+        distanceKm: match.element.distanceMeters / 1000,
+        travelTimeMin: match.element.durationSeconds / 60,
+        source: match.source,
+      }
+    }
+  }
+
+  // Fallback to haversine
+  const distanceKm = haversineDistance(fromLat, fromLon, toLat, toLon)
+  const travelTimeMin = estimateTravelTime(distanceKm)
+  return { distanceKm, travelTimeMin, source: 'fallback' }
+}
+
+/**
  * Helper to build StoreVisit array with distances
  */
 function buildStoreVisits(
   origin: { lat: number; lon: number },
   orderedStores: { id: number; lat: number; lon: number }[],
   assignments: ItemAssignment[],
+  distanceData?: DistanceMatrixResult[],
 ): StoreVisit[] {
   const storeVisits: StoreVisit[] = []
   let prevLat = origin.lat
@@ -331,8 +377,7 @@ function buildStoreVisits(
 
   for (let i = 0; i < orderedStores.length; i++) {
     const store = orderedStores[i] as Store
-    const distanceKm = haversineDistance(prevLat, prevLon, store.lat, store.lon)
-    const travelTimeMin = estimateTravelTime(distanceKm)
+    const { distanceKm, travelTimeMin, source } = lookupDistance(prevLat, prevLon, store.lat, store.lon, distanceData)
     const itemCount = assignments.filter((a) => a.storeId === store.id).length
 
     storeVisits.push({
@@ -341,6 +386,7 @@ function buildStoreVisits(
       distanceFromPrevKm: Math.round(distanceKm * 100) / 100,
       travelTimeFromPrevMin: Math.round(travelTimeMin),
       itemCount,
+      distanceSource: source,
     })
 
     prevLat = store.lat

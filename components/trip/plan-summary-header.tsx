@@ -41,29 +41,29 @@ export function PlanSummaryHeader({ plan }: PlanSummaryHeaderProps) {
   return (
     <div className="space-y-4">
       {/* Summary Sentence */}
-      <div className="rounded-lg border border-border bg-muted/30 p-4">
+      <div className="glass-elevated rounded-2xl border-glow-green p-6 shadow-2xl">
         <p className="text-base leading-relaxed text-foreground">{summaryText}</p>
       </div>
 
       {/* Detailed Metrics */}
       <div>
-        <h4 className="mb-3 font-semibold text-foreground">Trip Details</h4>
+        <h4 className="mb-4 text-lg font-semibold text-primary">Trip Details</h4>
         <div className="grid gap-4 sm:grid-cols-4">
-          <div>
+          <div className="glass rounded-xl p-4 float-on-hover transition-spring">
             <p className="text-sm text-muted-foreground">Total Cost</p>
-            <p className="text-xl font-bold text-foreground">${plan.totalPrice.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-primary text-glow-green">${plan.totalPrice.toFixed(2)}</p>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Travel Distance</p>
-            <p className="text-xl font-bold text-foreground">{plan.totalDistanceKm.toFixed(1)} km</p>
+          <div className="glass rounded-xl p-4 float-on-hover transition-spring">
+            <p className="text-sm text-muted-foreground">Driving Distance</p>
+            <p className="text-2xl font-bold text-accent text-glow-cyan">{plan.totalDistanceKm.toFixed(1)} km</p>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Travel Time</p>
-            <p className="text-xl font-bold text-foreground">{Math.round(plan.totalTravelTimeMin)} min</p>
+          <div className="glass rounded-xl p-4 float-on-hover transition-spring">
+            <p className="text-sm text-muted-foreground">Driving Time</p>
+            <p className="text-2xl font-bold text-secondary text-glow-purple">{Math.round(plan.totalTravelTimeMin)} min</p>
           </div>
-          <div>
+          <div className="glass rounded-xl p-4 float-on-hover transition-spring">
             <p className="text-sm text-muted-foreground">Total Time</p>
-            <p className="text-xl font-bold text-foreground">~{Math.round(plan.estimatedTotalTimeMin)} min</p>
+            <p className="text-2xl font-bold text-foreground">~{Math.round(plan.estimatedTotalTimeMin)} min</p>
           </div>
         </div>
       </div>

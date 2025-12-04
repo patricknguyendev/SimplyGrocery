@@ -23,20 +23,25 @@ export function TripPlansView({ plans }: TripPlansViewProps) {
   return (
     <div className="space-y-6">
       {/* Trip Summary Section */}
-      <Card>
+      <Card className="glass-elevated rounded-2xl shadow-2xl border-glow-green">
         <CardContent className="pt-6">
           <PlanSummaryHeader plan={selectedPlan} />
         </CardContent>
       </Card>
 
       {/* Plan Selection Cards */}
-      <div>
-        <h2 className="mb-4 text-xl font-semibold text-foreground">Choose Your Plan</h2>
+      <div className="relative">
+        {/* Decorative isometric tile */}
+        <div className="iso-tile iso-tile--green iso-orbit-slow -left-10 -top-5 opacity-70 hidden lg:block" aria-hidden="true" />
+
+        <h2 className="mb-6 text-3xl font-bold text-center bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+          Choose Your Plan
+        </h2>
         <PlanSelector plans={plans} selectedPlanId={selectedPlanId} onSelectPlan={setSelectedPlanId} />
       </div>
 
       {/* Selected Plan Details */}
-      <Card>
+      <Card className="glass-elevated rounded-2xl shadow-2xl border-glow-green">
         <CardContent className="pt-6">
           <StoreVisitList plan={selectedPlan} />
         </CardContent>

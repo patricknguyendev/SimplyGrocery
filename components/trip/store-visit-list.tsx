@@ -9,6 +9,19 @@ interface StoreVisitListProps {
 }
 
 export function StoreVisitList({ plan }: StoreVisitListProps) {
+  // Determine distance source for attribution
+  const hasGoogle = plan.stores.some(s => s.distanceSource === 'google')
+  const hasFallback = plan.stores.some(s => s.distanceSource === 'fallback')
+
+  let attributionText = ''
+  if (hasGoogle && !hasFallback) {
+    attributionText = 'Distances powered by Google Maps'
+  } else if (hasGoogle && hasFallback) {
+    attributionText = 'Distances from Google Maps and approximate calculations'
+  } else if (hasFallback) {
+    attributionText = 'Distances are approximated'
+  }
+
   return (
     <div className="space-y-4">
       <div className="mb-4">
@@ -32,6 +45,12 @@ export function StoreVisitList({ plan }: StoreVisitListProps) {
           />
         ))}
       </div>
+
+      {attributionText && (
+        <p className="text-xs text-muted-foreground text-center pt-2">
+          {attributionText}
+        </p>
+      )}
     </div>
   )
 }
@@ -55,15 +74,15 @@ function StoreVisitCard({
       {/* Connection line */}
       {!isLast && <div className="absolute left-5 top-16 h-full w-0.5 bg-border" />}
 
-      <div className="rounded-lg border border-border bg-card">
+      <div className="glass rounded-2xl shadow-xl float-on-hover transition-spring glow-green-hover">
         {/* Store header */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex w-full items-center justify-between p-4 text-left"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">
-              {stopNumber}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/20 border-2 border-primary glow-green shadow-lg">
+              <span className="font-bold text-primary">{stopNumber}</span>
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -78,7 +97,7 @@ function StoreVisitCard({
                 <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                   <MapPin className="h-3 w-3" />
                   {storeVisit.distanceFromPrevKm.toFixed(1)} km • {Math.round(storeVisit.travelTimeFromPrevMin)} min
-                  from previous
+                  drive from previous
                 </p>
               )}
             </div>

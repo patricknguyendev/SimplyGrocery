@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { estimateTravelTime, haversineDistance } from "@/lib/geo/distance"
 
 /**
  * GET /api/trips/:id
@@ -112,7 +113,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           savingsVsWalmart: plan.savings_vs_walmart,
           savingsVsTarget: plan.savings_vs_target,
           savingsVsCostco: plan.savings_vs_costco,
-          stores: (storeVisits || []).map((sv) => {
+          stores: (storeVisits || []).map((sv, index) => {
             const store = sv.stores as {
               id: number
               name: string
@@ -126,6 +127,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
             const storeAssignments = assignmentsByStore.get(store.id) || []
 
+            // Infer distance source by comparing stored values to haversine fallback
+            let distanceSource: "google" | "fallback" = "fallback"
+            if (
+              typeof trip.origin_lat === "number" &&
+              typeof trip.origin_lon === "number" &&
+              typeof store.lat === "number" &&
+              typeof store.lon === "number" &&
+              sv.distance_from_prev_km !== null &&
+              sv.travel_time_from_prev_min !== null
+            ) {
+              const hasPrev = index > 0 && storeVisits && storeVisits[index - 1]?.stores
+              const prevStore = hasPrev ? (storeVisits![index - 1].stores as typeof store) : null
+              const prevLat = hasPrev && prevStore ? prevStore.lat : trip.origin_lat
+              const prevLon = hasPrev && prevStore ? prevStore.lon : trip.origin_lon
+
+              const fallbackDistance = haversineDistance(prevLat, prevLon, store.lat, store.lon)
+              const fallbackDistanceRounded = Math.round(fallbackDistance * 100) / 100
+              const fallbackTimeRounded = Math.round(estimateTravelTime(fallbackDistance))
+
+              const storedDistance = Number(sv.distance_from_prev_km)
+              const storedTime = Number(sv.travel_time_from_prev_min)
+
+              const matchesFallback =
+                Math.abs(storedDistance - fallbackDistanceRounded) < 0.01 &&
+                Math.abs(storedTime - fallbackTimeRounded) <= 1
+
+              distanceSource = matchesFallback ? "fallback" : "google"
+            }
+
             return {
               store: {
                 id: store.id,
@@ -138,6 +168,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               orderIndex: sv.order_index,
               distanceFromPrevKm: sv.distance_from_prev_km,
               travelTimeFromPrevMin: sv.travel_time_from_prev_min,
+              distanceSource,
               items: storeAssignments.map((a) => ({
                 productId: (a.products as { id: number; name: string }).id,
                 productName: (a.products as { id: number; name: string }).name,

@@ -28,14 +28,10 @@ export default async function HomePage() {
   return (
     <main className="min-h-screen bg-background">
       {/* Hero Section */}
-      <section className="relative overflow-hidden border-b border-border/50">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 gradient-animated opacity-20" />
-        <div className="absolute inset-0 backdrop-glass" />
-
+      <section className="section-glow section-glow--primary relative bg-muted/10">
         <div className="container relative mx-auto px-6 py-32 sm:py-40">
           <div className="mx-auto max-w-4xl text-center fade-in-up">
-            <div className="relative mb-6 inline-block">
+            <div className="relative mb-8 inline-block">
               {/* Isometric hero tiles */}
               <div
                 className="iso-tile iso-tile--green iso-orbit-slow -left-28 -top-10 hidden md:block opacity-80"
@@ -45,8 +41,11 @@ export default async function HomePage() {
                 className="iso-tile iso-tile--purple iso-orbit-fast left-20 top-8 hidden lg:block opacity-75"
                 aria-hidden="true"
               />
-              <div className="relative rounded-2xl bg-gradient-green-cyan p-4 shadow-2xl glow-green float-subtle">
-                <ShoppingCart className="h-16 w-16 text-background" />
+
+              {/* Brand text with static "Simply" and animated "Grocery" */}
+              <div className="hero-brand float-subtle">
+                <span className="text-emerald-300">Simply</span>
+                <span className="text-drip">Grocery</span>
               </div>
             </div>
             <h1 className="text-5xl font-bold tracking-tight text-foreground sm:text-7xl mb-6">
@@ -80,8 +79,7 @@ export default async function HomePage() {
       </section>
 
       {/* How It Works Section */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-0 -top-40 h-64 gradient-animated opacity-12" />
+      <section className="section-glow section-glow--primary relative bg-background">
         <div className="container mx-auto px-6 py-24 relative">
           <div className="relative mb-16">
             <h2 className="text-center text-4xl font-bold text-foreground mb-4">How SimplyGrocery works</h2>
@@ -243,8 +241,7 @@ export default async function HomePage() {
       </section>
 
       {/* Data Coverage Section */}
-      <section className="relative border-t border-border/50 glass-subtle overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-0 -top-40 h-64 gradient-animated opacity-10" />
+      <section className="section-glow section-glow--alt relative bg-muted/10">
         <div className="container mx-auto px-6 py-24 relative">
           <div className="mx-auto max-w-5xl">
             <div className="relative mb-16">
@@ -305,14 +302,22 @@ export default async function HomePage() {
       </section>
 
       {/* Plan Types Preview */}
-      <section className="relative overflow-hidden border-t border-border/40">
-        <div className="pointer-events-none absolute inset-x-0 -top-40 h-64 gradient-animated opacity-10" />
+      <section className="section-glow section-glow--primary relative bg-background">
         <div className="container mx-auto px-6 py-24 relative">
-          <h2 className="text-center text-4xl font-bold text-foreground mb-4">Trip Plan Options</h2>
-          <p className="mt-2 text-center text-muted-foreground text-lg mb-16">
-            Choose the plan that fits your needs
-          </p>
-          <div className="grid gap-8 sm:grid-cols-3">
+          <div className="relative mb-16 mx-auto max-w-6xl">
+            <h2 className="text-center text-4xl font-bold text-foreground mb-4">Trip Plan Options</h2>
+            <p className="mt-2 text-center text-muted-foreground text-lg">
+              Choose the plan that fits your needs
+            </p>
+            {/* Section isometric accent */}
+            <div
+              className="pointer-events-none absolute -right-24 -top-10 hidden md:block"
+              aria-hidden="true"
+            >
+              <div className="iso-tile iso-tile--purple iso-orbit-fast opacity-60" />
+            </div>
+          </div>
+          <div className="grid gap-8 sm:grid-cols-3 max-w-6xl mx-auto">
             <Card className="border-primary/40 glow-green-hover group transition-spring hover:scale-105">
               <CardHeader>
                 <div className="flex items-center gap-3 mb-3">

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useSavedLists } from "@/lib/use-saved-lists"
 
 interface ShoppingItem {
   id: string
@@ -30,12 +31,16 @@ export default function NewTripPage() {
   const [lon, setLon] = useState<number | null>(null)
 
   // Items state
-  const [items, setItems] = useState<ShoppingItem[]>([{ id: crypto.randomUUID(), rawQuery: "", quantity: 1 }])
+  const [items, setItems] = useState<ShoppingItem[]>([{ id: "initial-item-0", rawQuery: "", quantity: 1 }])
 
   // Preferences state
   const [maxStores, setMaxStores] = useState(3)
   const [maxRadiusKm, setMaxRadiusKm] = useState(15)
   const [strategy, setStrategy] = useState<"ALL" | "CHEAPEST" | "FASTEST" | "BALANCED">("ALL")
+
+  // Saved lists
+  const { savedLists, saveList, deleteList } = useSavedLists()
+  const [selectedSavedListId, setSelectedSavedListId] = useState<string>("")
 
   const useExampleLocation = () => {
     setZip("94040")
@@ -55,6 +60,45 @@ export default function NewTripPage() {
 
   const updateItem = (id: string, field: "rawQuery" | "quantity", value: string | number) => {
     setItems(items.map((item) => (item.id === id ? { ...item, [field]: value } : item)))
+  }
+
+  const handleSaveCurrentList = () => {
+    const payload = items
+      .filter((item) => item.rawQuery.trim() !== "")
+      .map((item) => ({
+        rawQuery: item.rawQuery,
+        quantity: item.quantity,
+      }))
+
+    if (payload.length === 0) {
+      if (typeof window !== "undefined") {
+        window.alert("Add at least one item before saving a list.")
+      }
+      return
+    }
+
+    if (typeof window === "undefined") return
+
+    const name = window.prompt("Save current list as", "Weekly staples")
+    if (!name) return
+
+    const newList = saveList(name, payload)
+    if (newList) {
+      setSelectedSavedListId(newList.id)
+    }
+  }
+
+  const handleLoadList = (id: string) => {
+    const list = savedLists.find((l) => l.id === id)
+    if (!list) return
+
+    setItems(
+      list.items.map((item) => ({
+        id: crypto.randomUUID(),
+        rawQuery: item.rawQuery,
+        quantity: item.quantity,
+      })),
+    )
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,18 +168,21 @@ export default function NewTripPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Link>
-          <h1 className="mt-4 text-3xl font-bold tracking-tight text-foreground">Plan Your Trip</h1>
-          <p className="mt-2 text-muted-foreground">
-            Add your shopping list and preferences to get optimized trip plans.
-          </p>
-        </div>
+      <section className="section-glow section-glow--primary relative bg-muted/10">
+        <div className="container mx-auto px-4 py-12">
+          {/* Header */}
+          <div className="mb-8">
+            <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary hover:text-glow-green transition-spring">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
+            </Link>
+            <h1 className="mt-4 text-4xl font-bold tracking-tight bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+              Plan Your Trip
+            </h1>
+            <p className="mt-2 text-lg text-muted-foreground">
+              Add your shopping list and preferences to get optimized trip plans.
+            </p>
+          </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Error Alert */}
@@ -146,14 +193,14 @@ export default function NewTripPage() {
           )}
 
           {/* Origin Section */}
-          <Card>
+          <Card className="glass rounded-2xl shadow-2xl border-glow-green float-on-hover transition-spring">
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <MapPin className="h-5 w-5 text-primary" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 shadow-lg glow-green">
+                  <MapPin className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <CardTitle>Your Location</CardTitle>
+                  <CardTitle className="text-xl text-primary">Your Location</CardTitle>
                   <CardDescription>Where are you starting from?</CardDescription>
                 </div>
               </div>
@@ -189,24 +236,80 @@ export default function NewTripPage() {
           </Card>
 
           {/* Items Section */}
-          <Card>
+          <Card className="glass rounded-2xl shadow-2xl border-glow-green float-on-hover transition-spring">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <ShoppingCart className="h-5 w-5 text-primary" />
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/20 shadow-lg glow-cyan">
+                    <ShoppingCart className="h-6 w-6 text-accent" />
                   </div>
                   <div>
-                    <CardTitle>Shopping List</CardTitle>
+                    <CardTitle className="text-xl text-accent">Shopping List</CardTitle>
                     <CardDescription>
                       Add items you want to buy (e.g., &quot;milk&quot;, &quot;spaghetti&quot;, &quot;eggs&quot;)
                     </CardDescription>
                   </div>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Item
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Item
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={handleSaveCurrentList}>
+                    Save current list
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="savedLists" className="sr-only">
+                      Saved lists
+                    </Label>
+                    <Select
+                      value={selectedSavedListId}
+                      onValueChange={(val) => {
+                        setSelectedSavedListId(val)
+                        handleLoadList(val)
+                      }}
+                      disabled={savedLists.length === 0}
+                    >
+                      <SelectTrigger id="savedLists" size="sm">
+                        <SelectValue placeholder={savedLists.length === 0 ? "No saved lists" : "Load list"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {savedLists.length === 0 ? (
+                          <SelectItem disabled value="__none">
+                            No saved lists yet
+                          </SelectItem>
+                        ) : (
+                          savedLists.map((list) => (
+                            <SelectItem key={list.id} value={list.id}>
+                              <span className="flex w-full items-center justify-between">
+                                <span>
+                                  {list.name}
+                                  <span className="ml-1 text-xs text-muted-foreground">
+                                    ({list.items.length} item{list.items.length !== 1 ? "s" : ""})
+                                  </span>
+                                </span>
+                                <button
+                                  type="button"
+                                  className="text-xs text-muted-foreground hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    deleteList(list.id)
+                                    if (selectedSavedListId === list.id) {
+                                      setSelectedSavedListId("")
+                                    }
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </span>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -253,14 +356,14 @@ export default function NewTripPage() {
           </Card>
 
           {/* Preferences Section */}
-          <Card>
+          <Card className="glass rounded-2xl shadow-2xl border-glow-green float-on-hover transition-spring">
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Settings2 className="h-5 w-5 text-primary" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary/20 shadow-lg glow-purple">
+                  <Settings2 className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <CardTitle>Trip Preferences</CardTitle>
+                  <CardTitle className="text-xl text-secondary">Trip Preferences</CardTitle>
                   <CardDescription>Customize your optimization settings</CardDescription>
                 </div>
               </div>
@@ -315,7 +418,7 @@ export default function NewTripPage() {
 
           {/* Submit Button */}
           <div className="flex justify-end">
-            <Button type="submit" size="lg" disabled={isLoading}>
+            <Button type="submit" size="lg" variant="neon" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -330,7 +433,8 @@ export default function NewTripPage() {
             </Button>
           </div>
         </form>
-      </div>
+        </div>
+      </section>
     </main>
   )
 }

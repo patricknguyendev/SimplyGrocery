@@ -65,7 +65,7 @@ export interface StoreProductPrice {
 
 export interface Trip {
   id: number
-  user_id: number | null
+  user_id: string | null // UUID from auth.users
   origin_lat: number | null
   origin_lon: number | null
   origin_zip: string | null

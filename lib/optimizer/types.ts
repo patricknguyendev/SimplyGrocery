@@ -38,6 +38,7 @@ export interface MatchedItem {
   quantity: number
   product: Product
   tripItemId?: number
+  matchedName?: string // The actual product name that was matched
 }
 
 export interface StoreWithDistance extends Store {
@@ -77,6 +78,7 @@ export interface StoreVisit {
   distanceFromPrevKm: number
   travelTimeFromPrevMin: number
   itemCount: number
+  distanceSource: 'google' | 'fallback' // Tracks whether distance is from Google or haversine
 }
 
 // Response types
@@ -99,6 +101,9 @@ export interface TripResponse {
     } | null
   }[]
   plans: PlanResponse[]
+  debug?: {
+    distanceSource: 'google' | 'fallback' | 'mixed'
+  }
 }
 
 export interface PlanResponse {
@@ -125,6 +130,7 @@ export interface PlanResponse {
     orderIndex: number
     distanceFromPrevKm: number
     travelTimeFromPrevMin: number
+    distanceSource: 'google' | 'fallback'
     items: {
       productId: number
       productName: string

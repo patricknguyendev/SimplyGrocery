@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { optimizeTrip } from "@/lib/optimizer"
 import type { TripRequest } from "@/lib/optimizer/types"
+import { getCurrentUser } from "@/lib/auth/get-current-user"
 
 /**
  * POST /api/trips
@@ -37,7 +38,23 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient()
-    const response = await optimizeTrip(supabase, tripRequest)
+
+    // Get current user (optional - guests can still create trips)
+    const user = await getCurrentUser()
+
+    const response = await optimizeTrip(supabase, tripRequest, user?.id || null)
+
+    // Log trip event for analytics (non-blocking for the main response)
+    try {
+      await supabase.from("trip_events").insert({
+        trip_id: response.tripId,
+        number_of_items: body.items.length,
+        selected_strategy: body.preferences?.strategy || "ALL",
+      })
+    } catch (analyticsError) {
+      console.error("Failed to log trip event:", analyticsError)
+      // Intentionally do not re-throw; analytics failures should not block trip responses
+    }
 
     return NextResponse.json(response, { status: 201 })
   } catch (error) {
